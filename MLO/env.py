@@ -4,9 +4,9 @@ import numpy as np
 import random
 from typing import List, Tuple, Dict, Optional
 
-from nstr_model import ThroughputNSTR
-from utils import AP, NonAP
-from Algorithms.exp3 import EXP3
+from .nstr import ThroughputNSTR
+from .utils import AP, NonAP
+from mab.algorithms.exp3 import EXP3
 
 def euclid(a: np.ndarray, b: np.ndarray):
     "To find the distance between two AP and non-AP."
@@ -15,7 +15,8 @@ def euclid(a: np.ndarray, b: np.ndarray):
 
 def build_arms_for_ap(ap_id: int, n_links: int) -> List[Tuple[int, int]]:
     "For a given AP, return the list of arms it offers."
-    return [(ap_id, i_link) for i_link in range(n_links + 1)]
+    total_combs = 2 ** n_links - 1   # Total possible combination of links for an AP.
+    return [(ap_id, i_link) for i_link in range(total_combs)]
 
 
 def compute_system_throughputs(aps: List[AP], w0, m, normalized) -> Dict[int, float]:
@@ -47,14 +48,14 @@ def compute_system_throughputs(aps: List[AP], w0, m, normalized) -> Dict[int, fl
 class MABEnvironment:
     def __init__(
         self,
-        n_aps=3,
-        m_nonaps=10,
-        n_links=2,
+        n_aps,
+        m_nonaps,
+        n_links,
         area_size=1.0,
         d1=0.4,
         seed: Optional[int] = None,
         learner=None,
-        args=None,
+        kwargs=None,
         normalized=False,
     ):
         """
@@ -76,7 +77,7 @@ class MABEnvironment:
         self.throughputs = 0
         self.gamma = 0.1
         self.learner = learner
-        self.learner_args = args # A dict to initialize the learner.
+        self.learner_args = kwargs # A dict to initialize the learner.
         self.normalized = normalized
 
         # place APs and non-APs
@@ -94,10 +95,11 @@ class MABEnvironment:
                 np.random.rand() * self.area,
                 np.random.rand() * self.area,
             )  # Pos of the AP
-            self.aps.append(AP(i, pos))
-            self.n_association_per_link = [
-                0 for _ in range(self.n_links + 1)
-            ]  # Initialize association counts per link
+
+            # Initiate non ap connection
+            ap = AP(i, pos)
+            ap.n_association_per_link = [0] * 3 # Throughput calculation is based on this config only.
+            self.aps.append(ap)
 
     def spawn_nonaps(self):
         # non-AP placement
@@ -128,9 +130,10 @@ class MABEnvironment:
 
     def _init_nonap_learners(self):
         "Assign learning mechanism (EXP3) to each non-AP based on available arms."
-        for na in self.nonaps:
+        for i, na in enumerate(self.nonaps):
             K = len(na.available_arms)
-            na.learner = self.learner(K, self.learner_args)
+            self.learner_args['seed'] = i+1
+            na.learner = self.learner(K, **self.learner_args)
 
     def _update_ap_conn(self, na, act_idx):
         """
@@ -177,7 +180,7 @@ class MABEnvironment:
         """
         # Select arms for each non-AP and update the association map.
         for na in self.nonaps:
-            act_idx = na.learner.choose_action()  # Arm selected by the non-AP
+            act_idx = na.learner.select_action()  # Arm selected by the non-AP
             self._update_ap_conn(na, act_idx)
 
         # 2) compute the system throughputs per APs. ap_id -> [th1, th2, th12]
@@ -189,9 +192,9 @@ class MABEnvironment:
                 continue
             self._update_learner_weights(na, ap_throughputs)
 
-    def run(self, T: int, w0: int, m: int):
+    def run(self, T: int, w0: int, m: int, print_time=500):
         for iter in range(T):
             self.step(w0, m)
 
-            # if iter % 10 == 0:
-            #     print("No. of iter:", iter)
+            if iter % print_time == 0:
+                print(f'iter: {iter}, probs: {self.nonaps[0].learner.probs}')

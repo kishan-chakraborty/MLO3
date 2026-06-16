@@ -14,7 +14,7 @@ import numpy as np
 from math import comb
 from typing import Dict, Tuple
 
-from bianchi import calculate_throughput, times_basic
+from .bianchi import calculate_throughput, times_basic
 
 params = {
     "channel_rate": 216_000_000.0,  # 216 Mbit/s

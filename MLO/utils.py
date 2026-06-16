@@ -1,5 +1,4 @@
 import numpy as np
-from nstr import ThroughputNSTR
 from typing import List, Tuple, Dict
 import seaborn as sns
 
@@ -13,7 +12,7 @@ class AP:
         # For bookkeeping: which non-APs are currently associated.
         self.associations: Dict[int, int] = {}  # non-ap id -> connected link
         # Which link has how many devices connected. [n1_sld, n2_sld, n_mld]
-        self.n_association_per_link = [0, 0, 0]
+        self.n_association_per_link = None
 
 
 class NonAP:
@@ -25,3 +24,30 @@ class NonAP:
         self.learner = None
         self.chosen_arms: List[tuple] = []  # Record all the cosen arms.
         self.throughputs: List[float] = []  # Record the throughputs per step.
+
+def cal_kl_distance(dist1, dist2):
+    """
+    To implement the KL divergence change in probabilty distribution of two consecutive probabilities over 
+    a set of actions. 
+    dist1: Probability dist. over A. (say at time t) shape T-1 x n_arms
+    dist2: Probability dist. over A. (say at time t+1), shape T-1 x n_arms
+    """
+    prob1 = np.array(dist1) # Prob at t
+    prob2 = np.array(dist2) # Prob at t+1
+
+    temp = np.log(prob2 / prob1)
+    return np.sum(prob2 * temp, axis=1)
+
+def cal_tv_distance(dist1, dist2):
+    """
+    Similar as above, calculate the total variation distance for two probability dist.
+    """
+    prob1 = np.array(dist1) # Prob at t
+    prob2 = np.array(dist2) # Prob at t+1
+    return 0.5 * np.abs(prob1-prob2).sum(axis=1)
+
+def cal_log_ratio_distance(dist1, dist2):
+    """
+    Not a typical distance but log of exponential values will give some information.
+    """
+    return np.log(dist2) - np.log(dist1)
