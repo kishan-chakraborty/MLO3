@@ -3,5 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mlo2"
+name = "mlo3"
 version = "0.1.0"
+[tool.setuptools.packages.find]
+include = ["MLO", "Algorithms"] # Only allow these two to be treated as packages
