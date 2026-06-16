@@ -1,1 +1,7 @@
 mlo2.egg-info
+__pycache__
+*.pkl
+*.pyc
+*.pyo
+*.egg-info
+*.json
