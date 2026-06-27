@@ -28,7 +28,7 @@ data_dir.mkdir(exist_ok=True)
 
 def run_experiment(seed):
     learner = EXP3Experimental
-    kwargs = {}
+    kwargs = {"gamma": 0.1}
 
     env = MABEnvironment(
         n_aps=n_aps,

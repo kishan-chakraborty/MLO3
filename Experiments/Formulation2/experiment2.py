@@ -1,6 +1,6 @@
 """
 This experiment is to observe the convergence of users when there are one AP.
-This state is followed from the previous state where users select an AP rather 
+This formulation is followed from the previous state where users select an AP rather 
 than a combination of AP-link.
 """
 
