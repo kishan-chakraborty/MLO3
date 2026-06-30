@@ -32,11 +32,20 @@ def cal_kl_distance(dist1, dist2):
     dist1: Probability dist. over A. (say at time t) shape T-1 x n_arms
     dist2: Probability dist. over A. (say at time t+1), shape T-1 x n_arms
     """
-    prob1 = np.array(dist1) # Prob at t
-    prob2 = np.array(dist2) # Prob at t+1
+    prob1 = np.clip(np.array(dist1), 1e-15, 1.0) # Prob at t
+    prob2 = np.clip(np.array(dist2), 1e-15, 1.0) # Prob at t+1
 
-    temp = np.log(prob2 / prob1)
-    return np.sum(prob2 * temp, axis=1)
+    # Normalize to ensure they remain valid probability distributions after clipping
+    prob1 /= np.sum(prob1, axis=-1, keepdims=True)
+    prob2 /= np.sum(prob2, axis=-1, keepdims=True)
+
+    # Standard KL formula: Sum( P * log(P / Q) )
+    loss = prob1 * np.log(prob1 / prob2)
+
+    if prob1.ndim == 1:
+        return np.sum(loss)
+    else:
+        return np.sum(loss, axis=1)
 
 def cal_tv_distance(dist1, dist2):
     """
@@ -44,7 +53,13 @@ def cal_tv_distance(dist1, dist2):
     """
     prob1 = np.array(dist1) # Prob at t
     prob2 = np.array(dist2) # Prob at t+1
-    return 0.5 * np.abs(prob1-prob2).sum(axis=1)
+
+    dim = dist1.ndim
+    
+    if dim == 1:
+        return 0.5 * np.abs(prob1-prob2)
+    else:
+        return 0.5 * np.abs(prob1-prob2).sum(axis=1)
 
 def cal_log_ratio_distance(dist1, dist2):
     """
