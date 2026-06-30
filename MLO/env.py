@@ -192,9 +192,9 @@ class MABEnvironment:
                 continue
             self._update_learner_weights(na, ap_throughputs)
 
-    def run(self, T: int, w0: int, m: int, print_time=500):
+    def run(self, T: int, w0: int, m: int, print_time=None):
         for iter in range(T):
             self.step(w0, m)
-
-            if iter % print_time == 0:
-                print(f'iter: {iter}, probs: {self.nonaps[0].learner.probs}')
+            if print_time:
+                if iter % print_time == 0:
+                    print(f'iter: {iter}, probs: {self.nonaps[0].learner.probs}')

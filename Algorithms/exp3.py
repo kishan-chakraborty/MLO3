@@ -5,7 +5,7 @@ instead of updating solely based on the observed reward.
 """
 import numpy as np
 from mab.algorithms.exp3 import EXP3
-from MLO.utils import cal_log_ratio_distance
+from MLO.utils import cal_tv_distance
 
 class EXP3Experimental(EXP3):
     name = "exp3_experimental"
@@ -24,7 +24,7 @@ class EXP3Experimental(EXP3):
             self.gamma / self.n_arms
         )
 
-        weight = 1 / (1 + 100*cal_log_ratio_distance(self.probs, probs))
+        weight = 1 / (1 + cal_tv_distance(self.probs, probs))
 
         probs = (1-weight) * self.probs + weight * probs
         return probs / sum(probs)
