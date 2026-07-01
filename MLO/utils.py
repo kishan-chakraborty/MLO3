@@ -20,10 +20,24 @@ class NonAP:
         self.id = nonap_id
         self.pos = np.array(pos)  # Position of the Non-AP
         self.visible_aps: List[int] = []  # AP ids within radius d1 (populated by env)
-        self.available_arms: List[Tuple[int, int]] = []  # list of (ap_id, arm_label)
+        self.available_actions: List[Tuple[int, int]] = []  # list of (ap_id, arm_label)
         self.learner = None
+
+        self.curr_act_id = None  # Currently associated (AP, link) pair.
         self.chosen_arms: List[tuple] = []  # Record all the cosen arms.
-        self.throughputs: List[float] = []  # Record the throughputs per step.
+        self.rewards: List[float] = []  # Record the throughputs per step.
+
+    def select_action(self):
+        if self.learner is None:
+            raise ValueError("Learner not assigned to Non-AP.")
+        action_index = self.learner.select_action()
+        return action_index
+    
+    def update_weights(self, curr_act_id, reward):
+        "Update the learner's weight for each non-ap"
+        self.learner.update(curr_act_id, reward)
+
+
 
 def cal_kl_distance(dist1, dist2):
     """
