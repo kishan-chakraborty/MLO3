@@ -45,121 +45,6 @@ def compute_system_throughputs(aps: List[AP], w0, m, normalized) -> Dict[int, fl
         ap_throughputs[ap.id] = [sld_thr1, sld_thr2, mld_thr1 + mld_thr2]
     return ap_throughputs
 
-class MABEnvironment:
-    def __init__(
-        self,
-        n_aps,
-        m_nonaps,
-        n_links,
-        area_size=1.0,
-        d1=0.4,
-        seed: Optional[int] = None,
-        learner=None,
-        kwargs=None,
-        normalized=False,
-    ):
-        """
-        n_aps: number of APs (each has two links)
-        m_nonaps: number of non-AP devices (each an MLD)
-        area_size: side length of square area
-        d1: discovery radius (non-AP sees AP if within d1)
-        params: simulation parameters for throughput etc.
-        """
-        if seed is not None:
-            np.random.seed(seed)
-            random.seed(seed)
-
-        self.n_aps = n_aps  # No. of APs
-        self.m_nonaps = m_nonaps  # No. of non-APs
-        self.n_links = n_links  # No. of links per AP
-        self.area = area_size  # Area size (square)
-        self.d1 = d1  # Discovery radius
-        self.throughputs = 0
-        self.gamma = 0.1
-        self.learner = learner
-        self.learner_args = kwargs # A dict to initialize the learner.
-        self.normalized = normalized
-
-        # place APs and non-APs
-        self.aps: List[AP] = []
-        self.nonaps: List[NonAP] = []
-        self._init_nodes()  # Initialize positions and visibility
-
-        # prepare learners for non-APs
-        self._init_nonap_learners()
-
-    def _init_nonap_learners(self):
-        "Assign learning mechanism (EXP3) to each non-AP based on available arms."
-        for i, na in enumerate(self.nonaps):
-            K = len(na.available_actions)
-            self.learner_args['seed'] = i+1
-            na.learner = self.learner(K, **self.learner_args)
-
-    def _update_ap_conn(self, na, act_idx):
-        """
-        If the non-ap choose a different connection, update connection"
-        Args:
-            na: non-ap
-            chosen_arm: Current chosen arm
-        """
-        chosen_arm = na.available_actions[act_idx]  # (ap_id, arm_label)
-
-        if len(na.chosen_arms) > 0:  # If there is a previous connection
-            # Remove the previous AP connection
-            last_chosen_arm = na.available_actions[na.chosen_arms[-1]]
-            prev_ap_id, prev_ap_link = last_chosen_arm
-            prev_ap = self.aps[prev_ap_id]
-            prev_ap.associations.pop(na.id)
-            prev_ap.n_association_per_link[prev_ap_link] -= 1
-
-        # Update the association of the non-AP to the chosen AP and link.
-        chosen_ap_id, chosen_link = chosen_arm
-        chosen_ap = self.aps[chosen_ap_id]
-        chosen_ap.associations[na.id] = chosen_link
-        chosen_ap.n_association_per_link[chosen_link] += 1
-
-        na.chosen_arms.append(act_idx)  # Store the index of the chosen arm
-
-    def _update_learner_weights(self, na, ap_throughputs):
-        "Update the learner's weight for each non-ap"
-        chosen_arm_idx = na.chosen_arms[-1]
-        connected_ap_id, connected_link = na.available_actions[chosen_arm_idx]
-        reward = ap_throughputs[connected_ap_id][connected_link]
-        action_idx = na.available_actions.index((connected_ap_id, connected_link))
-        na.learner.update(action_idx, reward)
-        na.throughputs.append(reward)
-        self.throughputs += reward
-
-    def step(self, w0, m):
-        """
-        Perform one time slot:
-        - Each non-AP chooses an arm (if any)
-        - Build associations mapping nonap_id -> (ap_id, arm)
-        - Compute per-AP throughput (bps) and per-nonAP reward (0..1)
-        - Update learners and return (ap_throughputs, total_system_reward)
-        """
-        # Select arms for each non-AP and update the association map.
-        for na in self.nonaps:
-            act_idx = na.learner.select_action()  # Arm selected by the non-AP
-            self._update_ap_conn(na, act_idx)
-
-        # 2) compute the system throughputs per APs. ap_id -> [th1, th2, th12]
-        ap_throughputs = compute_system_throughputs(self.aps, w0, m, self.normalized)
-
-        # Update the learner weights for each non-AP
-        for na in self.nonaps:
-            if na.learner is None or na.chosen_arms is None:
-                continue
-            
-            self._update_learner_weights(na, ap_throughputs)
-
-    def run(self, T: int, w0: int, m: int, print_time=None):
-        for iter in range(T):
-            self.step(w0, m)
-            if print_time:
-                if iter % print_time == 0:
-                    print(f'iter: {iter}, probs: {self.nonaps[0].learner.probs}')
-
 class TestBed:
     def __init__(self,
         n_aps,
@@ -233,13 +118,13 @@ class TestBed:
 
 
 class Experiment:
-    def __init__(self, test_bed, horizon, n_episodes, **kwargs):
+    def __init__(self, aps, non_aps, horizon, n_episodes, **kwargs):
         """
         test_bed: Collection of APs and NonAPs with various config.
         horizon: No. of iterations per episode.
         """
-        self.aps = test_bed.aps
-        self.nonaps = test_bed.nonaps
+        self.aps = aps
+        self.nonaps = non_aps
         self.horizon = horizon
         self.n_episodes = n_episodes
 
@@ -278,7 +163,7 @@ class Experiment:
     def reset_agent_histories(self):
         pass
         
-    def step(self, t):
+    def step(self):
         """
             Perform one time slot:
             - Each non-AP chooses an arm (if any)
@@ -298,12 +183,12 @@ class Experiment:
             if na.learner is None or na.chosen_arms is None:
                 continue
             curr_act_id = na.curr_act_id
-            conn_ap_id, conn_link = na.available_actions[na.curr_act_id]
+            conn_ap_id, conn_link = na.available_actions[curr_act_id]
             reward = ap_throughputs[conn_ap_id][conn_link]
-            na.update_weights(na.curr_act_id, reward)
+            na.update_weights(curr_act_id, reward)
 
             if self.store_rewards:
-                na.reward_hist.append(reward)
+                na.rewards.append(reward)
             
     def run(self, **kwargs):
         print_time = kwargs.get("print_time", self.horizon-1)
@@ -311,7 +196,8 @@ class Experiment:
         for episode in range(self.n_episodes):
             self.reset_agent_histories()
             for t in range(self.horizon):
-                self.step(t)
+
+                self.step()
                 if t % print_time == 0:
                     print(f'iter: {t}, probs: {self.nonaps[0].learner.probs}')
 
