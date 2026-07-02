@@ -12,12 +12,10 @@ def euclid(a: np.ndarray, b: np.ndarray):
     "To find the distance between two AP and non-AP."
     return np.linalg.norm(a - b)
 
-
 def build_arms_for_ap(ap_id: int, n_links: int) -> List[Tuple[int, int]]:
     "For a given AP, return the list of arms it offers."
     total_combs = 2 ** n_links - 1   # Total possible combination of links for an AP.
     return [(ap_id, i_link) for i_link in range(total_combs)]
-
 
 def compute_system_throughputs(aps: List[AP], w0, m, normalized) -> Dict[int, float]:
     """
@@ -115,7 +113,6 @@ class TestBed:
                 na.available_actions.extend(
                     build_arms_for_ap(ap_id, self.n_links)
                 )  # All the arms {1, 2, {1, 2}} that the the non-AP can choose from.
-
 
 class Experiment:
     def __init__(self, aps, non_aps, horizon, n_episodes, **kwargs):
@@ -228,21 +225,3 @@ if __name__ == "__main__":
     args = {'w0': w0, 'm': m}
     experiment = Experiment(test_bed, T, 1, **args)
     experiment.run()
-
-    # env = MABEnvironment(
-    #     n_aps=n_aps,
-    #     m_nonaps=m_nonaps,
-    #     area_size=area_size,
-    #     d1=d1,
-    #     seed=seed,
-    #     learner=learner,
-    #     learner_arg=learner_args,
-    #     normalized=True
-    # )
-    # # Create environment: 4 APs, 20 non-APs
-    
-    # env.run(T, w0, m)
-
-    # # Save the environment information
-    # with open("../experiment_data2/environment_data2.pkl", "wb") as f:
-    #     pickle.dump(env, f)
